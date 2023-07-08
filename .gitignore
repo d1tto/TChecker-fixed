@@ -1,0 +1,12 @@
+/build
+**/build/
+.gradle/
+gradle-2.0/
+projects/extensions/joern-fuzzyc/.testDB/
+projects/extensions/joern-fuzzyc/lib/
+projects/octopus/lib/
+projects/octopus/python/octopus-mlutils/dist/
+projects/octopus/python/octopus-mlutils/octopus_tools.egg-info/
+projects/octopus/python/octopus-tools/dist/
+projects/octopus/python/octopus-tools/octopus_tools.egg-info/
+projects/octopus/languages/joern/
