@@ -4,6 +4,8 @@ TChecker is a static taint analysis tool for PHP applications. The key idea in T
 
 ## Prerequisite
 
+**ONLY php7.0 is supported. When compiling php-ast, only install phpize7.0 and do not install other versions, as this will cause incorrect header files to be included.**
+
 ~~~~~~{.sh}
 Run php-cs-fixer (https://github.com/PHP-CS-Fixer/PHP-CS-Fixer) to fix the coding styles.
 Run phpjoern (https://github.com/malteskoruppa/phpjoern) to generate the node file and edge file for a PHP application.
