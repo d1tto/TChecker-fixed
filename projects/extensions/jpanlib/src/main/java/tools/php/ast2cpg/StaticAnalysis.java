@@ -79,6 +79,7 @@ public class StaticAnalysis  {
 	public static HashMap<Long, String> dstDim = new HashMap<Long, String>();
 	
 	public StaticAnalysis() {
+		System.out.println("[StaticAnalysis] begin");
 		init();
 		for(Long entry: PHPCGFactory.topFunIds) {
 			ID2Node = new HashMap<Long, Node>();
@@ -139,6 +140,7 @@ public class StaticAnalysis  {
 				else if(leftHandId.equals(dim)){
 					tmp1=dim;
 					String iden = getDIMIdentity(DIMNode);
+					System.out.printf("[init] array dim(id %d) `%s` is assignment target\n", dim, iden);
 					dstDim.put(stmt, iden);
 				}
 			}
@@ -230,7 +232,7 @@ public class StaticAnalysis  {
 			sinks.add(stmt);
 		}
 		
-		System.out.println(sinks);
+		System.out.printf("[init] sinks %s\n", sinks);
 		
 		//get the identity of the source class property and global variables
 		for(Long src: srcPropSet) {
@@ -578,8 +580,6 @@ public class StaticAnalysis  {
 			clean.add(stmt, stmt);
 		}
 		
-		System.out.println(stmt+": times: "+Edgetimes.get(stmt)+"size: "+Edgesize.get(stmt));
-		
 		return node;
 	}
 	
@@ -595,9 +595,6 @@ public class StaticAnalysis  {
 	//@param: one taint node, a boolean value indicating if the current statement is initial source
 	//@output: get taint status of this statement, add it to taint tree is it is tainted, and find the next statement ID 
 	private boolean traverse(Node node) {
-		
-		System.out.println("parse stmt: "+" "+node.astId+" "+node.inter+" "+node.intro+" "+node.caller);
-		//System.out.println("parse stmt: "+node.nodeId+" "+node.astId);
 		Long stmt = node.astId;
 		if(stmt==null) {
 			System.err.println("Fail to get statement location: "+stmt);
@@ -698,7 +695,7 @@ public class StaticAnalysis  {
 			else{
 				//this stmt is source statement, we add taint variables
 				if(srcStmt.containsKey(stmt)) {
-					System.out.println("source stmt: "+stmt);
+					System.out.printf("[traverse] meet source stmt %d \n", stmt);
 					//the source is used in call expression
 					List<Long> srcs = srcStmt.get(stmt);
 					boolean isarg = true;
@@ -710,7 +707,7 @@ public class StaticAnalysis  {
 							String funName = ASTUnderConstruction.idToNode.get(func).getEscapedCodeStr();
 							//the function is a sink function
 							if(PHPCGFactory.sinks.contains(func)) {
-								System.out.println("source is used in sink "+node.astId);
+								System.out.println("[traverse] source is used in sink "+node.astId);
 								Stack<Long> tmp = (Stack<Long>) node.caller.clone();
 								vulStmts.add(node.astId, tmp);
 								System.out.println("check: "+node.astId+" "+tmp);
@@ -718,7 +715,7 @@ public class StaticAnalysis  {
 							}
 							//the sourcs is santizized
 							else {
-								System.out.println("source is sanitized "+node.astId);
+								System.out.println("[traverse] source is sanitized "+node.astId);
 								for(int i=0; i<CSVCFGExporter.cfgSave.get(stmt).size(); i++) {
 									Long next = CSVCFGExporter.cfgSave.get(stmt).get(i);
 									Stack<Long> stack =(Stack<Long>) node.caller.clone();
@@ -844,11 +841,9 @@ public class StaticAnalysis  {
 				}
 				else{
 					//if it reaches sink without sanitization, we save the vulnerable path and return.
-					System.out.println("related: "+related);
 					if(!related.isEmpty() && sinks.contains(stmt)) {
 						Stack<Long> tmp = (Stack<Long>) node.caller.clone();
 						vulStmts.add(node.astId, tmp);
-						System.out.println("check: "+node.astId+" "+tmp);
 						//link the callee stmts related to return value to the caller
 						for(Long taint: related.keySet()) {
 							Long source = related.get(taint);
@@ -2799,7 +2794,9 @@ public class StaticAnalysis  {
 		}
 		
 		ASTNode stmtnode = ASTUnderConstruction.idToNode.get(caller);
-		
+
+		System.out.printf("\n[isrelated] stmt %d, intro %s, inter %s\n", stmt, intro, inter);
+
 		if(stmtnode instanceof AssignmentExpression && ((AssignmentExpression) stmtnode).getRight() instanceof CallExpressionBase) {
 			CallExpressionBase callsite = (CallExpressionBase) ((AssignmentExpression) stmtnode).getRight();
 			caller = callsite.getNodeId();
@@ -2834,28 +2831,30 @@ public class StaticAnalysis  {
 						ASTNode srcDimValue = ASTUnderConstruction.idToNode.get(dim);
 						String symbol2 = getDIMIdentity(srcDimValue);
 						//this srcdim in current statement is related to taint symbol
+						System.out.printf("\t[isrelated] array dim `%s` in assign right, tainted array dim %s\n", symbol2, dstDim.get(taint));
 						if(dstDim.get(taint).startsWith(symbol2) || symbol2.startsWith(dstDim.get(taint))) {
-							System.out.println("tainted DIM: "+stmt);
+							System.out.println("\t\t[isrealted] tainted array dim: " + stmt);
 							relatedNodes.put(dim, nodeID);
 						}
 					}
-					
-					
 				}
 			}
 			
 			//check if the statement has intro-data flow relationship with taint variable
 			if(DDG.rels.containsKey(taint)) {
+				System.out.printf("\t[isrelated] traverse the data-dep edges of taint %d\n", taint);
 				//get all the related statements of the taint
 				for(Pair<Long, String> tmp: DDG.rels.get(taint)) {
 					//the stmt has deta flow relationship with taint statement
 					if(tmp.getL().equals(stmt)) {
+						System.out.printf("\t[isrelated] current stmt %d has data-dep on taint %d\n", stmt, taint);
 						//the taint statement is a assignment
 						if(taintNode.getProperty("type").equals("AST_ASSIGN") || taintNode.getProperty("type").equals("AST_ASSIGN_OP") || taintNode.getProperty("type").equals("AST_ASSIGN_REF")) {
 							ASTNode leftValue = ((AssignmentExpression) taintNode).getLeft();
 							//the symbol in taint statement is an array
 							if(leftValue.getProperty("type").equals("AST_DIM")) {
 								String symbol1 = getDIMIdentity(leftValue);
+								System.out.printf("\t\t[isrelated] taint is array dim %s\n", symbol1);
 								//get the source dim in current stmt
 								if(srcDim.containsKey(stmt)) {
 									//get the locations of dim expressions in stmt
@@ -2863,8 +2862,10 @@ public class StaticAnalysis  {
 									for(Long dim: dims) {
 										ASTNode rightValue = ASTUnderConstruction.idToNode.get(dim);
 										String symbol2 = getDIMIdentity(rightValue);
+										System.out.printf("\t\t\t[isrelated] current arr dim is %s\n", symbol2);
 										//this srcdim in current statement is related to taint symbol
 										if(symbol1.startsWith(symbol2) || symbol2.startsWith(symbol1)) {
+											System.out.printf("\t\t\t[isrelated] they are related arrays\n", symbol2);
 											relatedNodes.put(dim, nodeID);
 										}
 									}
@@ -2872,6 +2873,7 @@ public class StaticAnalysis  {
 							}
 							//the taint variable is not an array
 							else {
+								System.out.printf("\t\t[isrelated] taint %d is not a array dim\n", taint);
 								ASTNode stmtNode = ASTUnderConstruction.idToNode.get(stmt);
 								if(stmtNode instanceof CallExpressionBase) {
 									String tag = tmp.getR();
@@ -2916,9 +2918,9 @@ public class StaticAnalysis  {
 						if(relatedNodes.isEmpty()) {
 							relatedNodes.put(stmt, nodeID);
 						}
-					}
-				}
-			}
+					} // if(tmp.getL().equals(stmt))
+				} // for(Pair<Long, String> tmp: DDG.rels.get(taint)) {
+			} // if(DDG.rels.containsKey(taint)) {
 		}
 		
 		//the stmt contains a source prop
@@ -2967,7 +2969,7 @@ public class StaticAnalysis  {
 				}
 			}
 		}
-		
+		System.out.printf("\t[isrelated] related taint-var-in-curr-stmt & stmt pair %s\n", relatedNodes);
 		return relatedNodes;
 	}
 	
@@ -3105,6 +3107,7 @@ public class StaticAnalysis  {
 	 * @return a$b$c
 	 */
 	public String getDIMIdentity(ASTNode node) {
+		ASTNode backup = node;
 		//$a[b][c], we do not return $a or $a[b], instead we only return $a[b][c]
 		if(PHPCSVEdgeInterpreter.child2parent.containsKey(node.getNodeId())) {
 			//the the parent of DIM variable
@@ -3135,6 +3138,7 @@ public class StaticAnalysis  {
 		if(identity.equals("")) {
 			return "-1";
 		}
+		// System.out.printf("[getDIMIdentity] node id `%d`, result is `%s`\n", backup.getNodeId(), identity);
 		return identity;
 	} 
 
